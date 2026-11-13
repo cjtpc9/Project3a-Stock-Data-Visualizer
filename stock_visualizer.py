@@ -1,14 +1,29 @@
+import os
 import requests
 import pygal
 from datetime import datetime
 
 
 def load_api_key():
-    with open("api_key.txt", "r") as file:
-        return file.read().strip()
+    environment_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+
+    if environment_key:
+        return environment_key.strip()
+
+    try:
+        with open("api_key.txt", "r") as file:
+            return file.read().strip()
+
+    except FileNotFoundError:
+        return None
 
 
 def get_stock_data(symbol, time_series, api_key):
+    if not api_key:
+        return None, (
+            "Alpha Vantage API key is not configured."
+        )
+
     url = "https://www.alphavantage.co/query"
 
     functions = {
