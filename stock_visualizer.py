@@ -8,99 +8,23 @@ def load_api_key():
         return file.read().strip()
 
 
-def get_chart_type():
-    print("\nChart Types")
-    print("-----------")
-    print("1. Bar")
-    print("2. Line")
-
-    while True:
-        choice = input(
-            "\nEnter the chart type you want (1, 2): "
-        ).strip()
-
-        if choice in ["1", "2"]:
-            return choice
-
-        print("Invalid selection. Please enter 1 or 2.")
-
-
-def get_time_series():
-    print(
-        "\nSelect the Time Series of the chart you want to Generate"
-    )
-    print(
-        "--------------------------------------------------------"
-    )
-    print("1. Intraday")
-    print("2. Daily")
-    print("3. Weekly")
-    print("4. Monthly")
-
-    while True:
-        choice = input(
-            "\nEnter time series option (1, 2, 3, 4): "
-        ).strip()
-
-        if choice in ["1", "2", "3", "4"]:
-            return choice
-
-        print(
-            "Invalid selection. Please enter 1, 2, 3, or 4."
-        )
-
-
-def get_date(prompt):
-    while True:
-        date_string = input(prompt).strip()
-
-        try:
-            return datetime.strptime(
-                date_string,
-                "%Y-%m-%d"
-            ).date()
-
-        except ValueError:
-            print(
-                "Invalid date. Please use YYYY-MM-DD format."
-            )
-
-
-def get_date_range():
-    while True:
-        start_date = get_date(
-            "\nEnter the beginning date (YYYY-MM-DD): "
-        )
-
-        end_date = get_date(
-            "Enter the end date (YYYY-MM-DD): "
-        )
-
-        if end_date >= start_date:
-            return start_date, end_date
-
-        print(
-            "Error: The end date cannot be before the beginning date."
-        )
-
-
 def get_stock_data(symbol, time_series, api_key):
     url = "https://www.alphavantage.co/query"
 
     functions = {
-        "1": (
+        "Intraday": (
             "TIME_SERIES_INTRADAY",
             "Time Series (60min)"
         ),
-        "2": (
+        "Daily": (
             "TIME_SERIES_DAILY",
             "Time Series (Daily)"
         ),
-        "3": (
+        "Weekly": (
             "TIME_SERIES_WEEKLY",
             "Weekly Time Series"
         ),
-        "4": (
+        "Monthly": (
             "TIME_SERIES_MONTHLY",
             "Monthly Time Series"
         )
@@ -114,10 +38,10 @@ def get_stock_data(symbol, time_series, api_key):
         "apikey": api_key
     }
 
-    if time_series == "1":
+    if time_series == "Intraday":
         params["interval"] = "60min"
 
-    if time_series == "2":
+    if time_series == "Daily":
         params["outputsize"] = "compact"
 
     try:
@@ -132,43 +56,39 @@ def get_stock_data(symbol, time_series, api_key):
         data = response.json()
 
         if "Error Message" in data:
-            print(
-                "\nError: Invalid stock symbol or API request."
-            )
-            return None
+            return None, "Invalid stock symbol or API request."
 
         if "Note" in data:
-            print(
-                "\nAPI request limit reached. "
+            return None, (
+                "API request limit reached. "
                 "Please try again later."
             )
-            return None
 
         if "Information" in data:
-            print("\nAlpha Vantage message:")
-            print(data["Information"])
-            return None
+            if time_series == "Intraday":
+                return None, (
+                    "Intraday stock data requires "
+                    "Alpha Vantage premium access. "
+                    "Please select Daily, Weekly, or Monthly."
+                )
+
+            return None, (
+                "Alpha Vantage could not complete "
+                "the request. Please try again later."
+            )
 
         if data_key not in data:
-            print(
-                "\nError: Stock data could not be found."
-            )
-            return None
+            return None, "Stock data could not be found."
 
-        return data[data_key]
+        return data[data_key], None
 
     except requests.RequestException:
-        print(
-            "\nError: Could not connect to Alpha Vantage."
-        )
-        return None
+        return None, "Could not connect to Alpha Vantage."
 
     except ValueError:
-        print(
-            "\nError: Invalid response received "
-            "from Alpha Vantage."
+        return None, (
+            "Invalid response received from Alpha Vantage."
         )
-        return None
 
 
 def filter_stock_data(
@@ -230,7 +150,7 @@ def create_chart(
         "margin_bottom": 100
     }
 
-    if chart_type == "1":
+    if chart_type == "Bar":
         chart = pygal.Bar(**chart_settings)
     else:
         chart = pygal.Line(**chart_settings)
@@ -251,7 +171,7 @@ def create_chart(
     close_prices = []
 
     for item in stock_data:
-        if time_series == "1":
+        if time_series == "Intraday":
             labels.append(
                 item["timestamp"]
             )
@@ -300,109 +220,4 @@ def create_chart(
         close_prices
     )
 
-    chart.render_in_browser()
-
-
-def run_visualizer():
-    symbol = input(
-        "\nEnter the stock symbol you are looking for: "
-    ).strip().upper()
-
-    if not symbol:
-        print(
-            "Error: A stock symbol is required."
-        )
-        return
-
-    chart_type = get_chart_type()
-
-    time_series = get_time_series()
-
-    start_date, end_date = get_date_range()
-
-    api_key = load_api_key()
-
-    print(
-        "\nRetrieving stock data..."
-    )
-
-    stock_data = get_stock_data(
-        symbol,
-        time_series,
-        api_key
-    )
-
-    if stock_data is None:
-        return
-
-    filtered_data = filter_stock_data(
-        stock_data,
-        start_date,
-        end_date
-    )
-
-    if not filtered_data:
-        print(
-            "\nNo stock data was found "
-            "for the selected date range."
-        )
-        return
-
-    print(
-        "\nStock data retrieved successfully."
-    )
-
-    print(
-        "Generating chart..."
-    )
-
-    create_chart(
-        symbol,
-        chart_type,
-        time_series,
-        filtered_data,
-        start_date,
-        end_date
-    )
-
-
-def main():
-    print(
-        "Stock Data Visualizer"
-    )
-
-    print(
-        "---------------------"
-    )
-
-    while True:
-        run_visualizer()
-
-        while True:
-            again = input(
-                "\nWould you like to view more stock data? "
-                "(y/n): "
-            ).strip().lower()
-
-            if again in [
-                "y",
-                "yes"
-            ]:
-                break
-
-            if again in [
-                "n",
-                "no"
-            ]:
-                print(
-                    "\nThank you and Goodbye!"
-                )
-                return
-
-            print(
-                "Please enter y or n."
-            )
-
-
-if __name__ == "__main__":
-    main()
+    return chart.render_data_uri()
