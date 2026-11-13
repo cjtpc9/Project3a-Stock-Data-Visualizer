@@ -33,30 +33,96 @@ def index():
     error_message = None
 
     if request.method == "POST":
-        symbol = request.form["symbol"]
-        chart_type = request.form["chart_type"]
-        time_series = request.form["time_series"]
-        start_date_string = request.form["start_date"]
-        end_date_string = request.form["end_date"]
+        symbol = request.form.get("symbol", "").strip()
+        chart_type = request.form.get("chart_type", "").strip()
+        time_series = request.form.get("time_series", "").strip()
+        start_date_string = request.form.get(
+            "start_date",
+            ""
+        ).strip()
+        end_date_string = request.form.get(
+            "end_date",
+            ""
+        ).strip()
 
-        try:
-            start_date = datetime.strptime(
-                start_date_string,
-                "%Y-%m-%d"
-            ).date()
+        valid_chart_types = [
+            "Bar",
+            "Line"
+        ]
 
-            end_date = datetime.strptime(
-                end_date_string,
-                "%Y-%m-%d"
-            ).date()
+        valid_time_series = [
+            "Intraday",
+            "Daily",
+            "Weekly",
+            "Monthly"
+        ]
 
-            if end_date < start_date:
+        if not symbol:
+            error_message = (
+                "Please select a stock symbol."
+            )
+
+        elif symbol not in symbols:
+            error_message = (
+                "Invalid stock symbol selected."
+            )
+
+        elif chart_type not in valid_chart_types:
+            error_message = (
+                "Please select a valid chart type."
+            )
+
+        elif time_series not in valid_time_series:
+            error_message = (
+                "Please select a valid time series."
+            )
+
+        elif not start_date_string:
+            error_message = (
+                "Please enter a start date."
+            )
+
+        elif not end_date_string:
+            error_message = (
+                "Please enter an end date."
+            )
+
+        else:
+            try:
+                start_date = datetime.strptime(
+                    start_date_string,
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+                error_message = (
+                    "Please enter a valid start date."
+                )
+                start_date = None
+
+            try:
+                end_date = datetime.strptime(
+                    end_date_string,
+                    "%Y-%m-%d"
+                ).date()
+
+            except ValueError:
+                if error_message is None:
+                    error_message = (
+                        "Please enter a valid end date."
+                    )
+                end_date = None
+
+            if (
+                error_message is None
+                and end_date < start_date
+            ):
                 error_message = (
                     "The end date cannot be before "
                     "the start date."
                 )
 
-            else:
+            if error_message is None:
                 api_key = load_api_key()
 
                 stock_data, error_message = get_stock_data(
@@ -87,9 +153,6 @@ def index():
                             start_date,
                             end_date
                         )
-
-        except ValueError:
-            error_message = "Please enter valid dates."
 
     return render_template(
         "index.html",
